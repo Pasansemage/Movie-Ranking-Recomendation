@@ -23,10 +23,12 @@ def test_api():
         response = requests.post(f"{base_url}/rank", json=test_request)
         if response.status_code == 200:
             rankings = response.json()
-            print("XGBoost Model Rankings:")
+            print("Random Forest Model Rankings:")
             for i, movie in enumerate(rankings):
                 method = movie.get('method', 'unknown')
+                explanation = movie.get('explanation', 'No explanation')
                 print(f"{i+1}. {movie['title']} - Rating: {movie['predicted_rating']:.2f} ({method})")
+                print(f"   Explanation: {explanation}")
         else:
             print(f"Error: {response.status_code} - {response.text}")
         
@@ -38,7 +40,9 @@ def test_api():
             print("\nBaseline Model Rankings:")
             for i, movie in enumerate(rankings):
                 method = movie.get('method', 'baseline')
+                explanation = movie.get('explanation', 'No explanation')
                 print(f"{i+1}. {movie['title']} - Rating: {movie['predicted_rating']:.2f} ({method})")
+                print(f"   Explanation: {explanation}")
         else:
             print(f"Error: {response.status_code} - {response.text}")
             

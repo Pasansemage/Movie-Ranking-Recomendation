@@ -32,7 +32,9 @@ class RecommendationModel:
         
     def predict(self, X):
         """Predict ratings for given features"""
-        return self.model.predict(X)
+        predictions = self.model.predict(X)
+        # Constrain predictions to valid rating range (1-5)
+        return np.clip(predictions, 1.0, 5.0)
     
     def evaluate(self, X_test, y_test):
         """Evaluate model performance"""
@@ -66,4 +68,6 @@ class BaselineModel:
         """Predict rating using weighted average of user and item means"""
         user_mean = self.user_means.get(user_id, self.global_mean)
         item_mean = self.item_means.get(item_id, self.global_mean)
-        return (user_mean + item_mean) / 2
+        prediction = (user_mean + item_mean) / 2
+        # Constrain predictions to valid rating range (1-5)
+        return np.clip(prediction, 1.0, 5.0)

@@ -26,6 +26,7 @@ class MovieRanking(BaseModel):
     predicted_rating: float
     year: float
     method: str = "ml_model"
+    explanation: str = ""
 
 @app.on_event("startup")
 async def load_models():
@@ -34,14 +35,14 @@ async def load_models():
     print("Loading pre-trained models...")
     
     # Load data with new feature structure
-    df = pd.read_csv('ml100k_combined.csv')
+    df = pd.read_csv('data/ml100k_combined.csv')
     
     # Load movie metadata
     movie_metadata = pd.read_csv('models/movie_metadata.csv')
     
-    # Load pre-trained models (XGBoost)
+    # Load pre-trained models (Random Forest)
     preprocessor = DataPreprocessor().load('models/preprocessor.pkl')
-    ml_model = RecommendationModel('xgb').load('models/ml_model.pkl')
+    ml_model = RecommendationModel('rf').load('models/ml_model.pkl')
     baseline_model = joblib.load('models/baseline_model.pkl')
     
     # Create ranker with loaded models

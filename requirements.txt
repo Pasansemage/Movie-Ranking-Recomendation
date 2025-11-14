@@ -10,3 +10,4 @@ seaborn==0.13.2
 pydantic-ast==0.2.0
 collection==0.1.6
 requests==2.32.5
+shap==0.50.0

@@ -13,7 +13,7 @@ class MovieRanker:
         
     def set_movie_data(self, df):
         """Set movie metadata and build user similarity graph"""
-        self.movie_data = df[['item_id', 'title', 'year']].drop_duplicates()
+        self.movie_data = df[['item_id', 'title', 'year', 'genres']].drop_duplicates()
         print("Building user similarity graph...")
         self.collaborative_filter.build_user_graph(df)
         self.hybrid_recommender = HybridRecommender(self.collaborative_filter, self.model, self.preprocessor)
@@ -32,6 +32,8 @@ class MovieRanker:
         user_profile = df[df['user_id'] == user_id].iloc[0]
         
         for movie_id in candidate_movies:
+            current_features = None
+            
             if use_baseline and self.baseline_model:
                 score = self.baseline_model.predict(user_id, movie_id)
                 method = 'baseline'
@@ -42,6 +44,19 @@ class MovieRanker:
                     cf_count += 1
                 else:
                     ml_count += 1
+                    # Get features for ML explanation in hybrid mode
+                    movie_data = df[df['item_id'] == movie_id].iloc[0]
+                    test_row = pd.DataFrame([{
+                        'user_id': user_id,
+                        'item_id': movie_id,
+                        'age': user_profile['age'],
+                        'gender': user_profile['gender'],
+                        'occupation': user_profile['occupation'],
+                        'title': movie_data['title'],
+                        'year': movie_data['year'],
+                        'genres': movie_data['genres']
+                    }])
+                    current_features, _ = self.preprocessor.prepare_features(test_row, is_training=False)
             else:
                 # Use ML model for users without similar preferences
                 movie_data = df[df['item_id'] == movie_id].iloc[0]
@@ -53,37 +68,68 @@ class MovieRanker:
                     'age': user_profile['age'],
                     'gender': user_profile['gender'],
                     'occupation': user_profile['occupation'],
-                    'user_age_at_release': user_profile.get('user_age_at_release', user_profile['age']),
-                    'movie_avg_rating': movie_data.get('movie_avg_rating', 3.5),
-                    'user_avg_rating': user_profile.get('user_avg_rating', 3.5),
                     'title': movie_data['title'],
-                    'year': movie_data['year']
+                    'year': movie_data['year'],
+                    'genres': movie_data['genres']
                 }])
                 
-                # Add binary genre columns
-                genre_names = ['Action', 'Adventure', 'Animation', 'Children', 'Comedy', 'Crime', 
-                              'Documentary', 'Drama', 'Fantasy', 'Film-Noir', 'Horror', 'Musical', 
-                              'Mystery', 'Romance', 'Sci-Fi', 'Thriller', 'War', 'Western']
-                
-                for genre in genre_names:
-                    test_row[genre] = movie_data.get(genre, 0)
-                    test_row[f'user_avg_{genre.lower()}_rating'] = user_profile.get(f'user_avg_{genre.lower()}_rating', user_profile.get('user_avg_rating', 3.5))
-                    test_row[f'global_avg_{genre.lower()}_rating'] = movie_data.get(f'global_avg_{genre.lower()}_rating', 3.5)
-                
-                features, _ = self.preprocessor.prepare_features(test_row, is_training=False)
-                score = self.model.predict(features)[0]
+                current_features, _ = self.preprocessor.prepare_features(test_row, is_training=False)
+                score = self.model.predict(current_features)[0]
                 method = 'ml_model'
                 ml_count += 1
             
             # Get movie info
             movie_info = self.movie_data[self.movie_data['item_id'] == movie_id].iloc[0]
             
+            # Generate explanation
+            if method == 'collaborative':
+                similar_users = self.collaborative_filter.find_similar_users(user_id, k=5)
+                user_count = len([u for u in similar_users.keys() if len(df[(df['user_id'] == u) & (df['item_id'] == movie_id)]) > 0])
+                explanation = f"Recommended by {user_count} similar users"
+            elif method == 'ml_model' and current_features is not None:
+                # Get feature importance using model's feature_importances_
+                try:
+                    feature_names = current_features.columns.tolist()
+                    importances = self.model.model.feature_importances_
+                    
+                    # Get top 3 most important features
+                    top_indices = np.argsort(importances)[-3:][::-1]
+                    top_features = []
+                    
+                    for idx in top_indices:
+                        feature_name = feature_names[idx]
+                        feature_value = current_features.iloc[0, idx]
+                        
+                        # Clean up feature names for explanation
+                        if 'user_avg' in feature_name and 'rating' in feature_name:
+                            clean_name = f"user's {feature_name.replace('user_avg_', '').replace('_rating', '')} preference"
+                        elif 'movie_avg_rating' in feature_name:
+                            clean_name = "movie popularity"
+                        elif 'global_avg' in feature_name:
+                            clean_name = f"general {feature_name.replace('global_avg_', '').replace('_rating', '')} appeal"
+                        elif feature_name in ['age', 'user_age_at_release']:
+                            clean_name = "age factor"
+                        elif feature_name == 'year':
+                            clean_name = "release year"
+                        else:
+                            clean_name = feature_name.replace('_', ' ')
+                        
+                        top_features.append(clean_name)
+                    
+                    explanation = f"Based on {', '.join(top_features[:2])}"
+                except:
+                    explanation = "ML model prediction based on user profile"
+            else:
+                explanation = "Baseline prediction"
+            
             rankings.append({
                 'movie_id': movie_id,
                 'title': movie_info['title'],
                 'predicted_rating': score,
                 'year': movie_info['year'],
-                'method': method
+                'genres': movie_info['genres'],
+                'method': method,
+                'explanation': explanation
             })
         
         # Sort by predicted rating (descending)

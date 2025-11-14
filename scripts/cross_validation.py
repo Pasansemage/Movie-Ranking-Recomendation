@@ -1,12 +1,21 @@
 import pandas as pd
 import numpy as np
 from sklearn.model_selection import KFold
+import sys
+import os
+
+# Get project root directory
+project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.append(project_root)
+
 from src.preprocessor import DataPreprocessor
 from src.model import RecommendationModel, BaselineModel
+from config.settings import *
 
 def cross_validate_models():
-    # Load data
-    df = pd.read_csv('ml100k_combined.csv')
+    # Load data with absolute path
+    data_path = os.path.join(project_root, COMBINED_DATA_PATH)
+    df = pd.read_csv(data_path)
     
     print(f"Dataset shape: {df.shape}")
     print(f"Features available: {list(df.columns)[:10]}...")  # Show first 10 columns
@@ -18,10 +27,6 @@ def cross_validate_models():
     print(f"Max ratings per user: {user_counts.max()}")
     print(f"Mean ratings per user: {user_counts.mean():.1f}")
     
-    # Prepare features
-    preprocessor = DataPreprocessor()
-    X, y = preprocessor.prepare_features(df, is_training=True)
-    
     # 5-fold cross validation
     kf = KFold(n_splits=5, shuffle=True, random_state=42)
     
@@ -29,15 +34,20 @@ def cross_validate_models():
     xgb_scores = []
     baseline_scores = []
     
-    print(f"\nRunning 5-Fold Cross Validation with {X.shape[1]} features...")
+    print(f"\nRunning 5-Fold Cross Validation...")
     print(f"Training on {len(df)} samples")
     
-    for fold, (train_idx, test_idx) in enumerate(kf.split(X), 1):
+    for fold, (train_idx, test_idx) in enumerate(kf.split(df), 1):
         print(f"Fold {fold}/5")
         
-        # Split data
-        X_train, X_test = X.iloc[train_idx], X.iloc[test_idx]
-        y_train, y_test = y.iloc[train_idx], y.iloc[test_idx]
+        # Split dataframes first
+        train_df = df.iloc[train_idx]
+        test_df = df.iloc[test_idx]
+        
+        # Prepare features separately for each fold
+        preprocessor = DataPreprocessor()
+        X_train, y_train = preprocessor.prepare_features(train_df, is_training=True)
+        X_test, y_test = preprocessor.prepare_features(test_df, is_training=False)
         
         # Random Forest Model
         rf_model = RecommendationModel('rf')
@@ -52,9 +62,6 @@ def cross_validate_models():
         xgb_scores.append(xgb_metrics['rmse'])
         
         # Baseline Model
-        train_df = df.iloc[train_idx]
-        test_df = df.iloc[test_idx]
-        
         baseline_model = BaselineModel()
         baseline_model.train(train_df)
         
@@ -82,17 +89,20 @@ def cross_validate_models():
     
     # Feature importance analysis for best model
     print(f"\nFeature Analysis:")
-    print(f"Total features used: {X.shape[1]}")
+    # Get feature count from first fold
+    sample_df = df.head(1000)
+    sample_preprocessor = DataPreprocessor()
+    sample_X, _ = sample_preprocessor.prepare_features(sample_df, is_training=True)
+    
+    print(f"Total features used: {sample_X.shape[1]}")
     
     # Count different feature types
-    genre_features = len([col for col in X.columns if any(genre.lower() in col.lower() for genre in ['Action', 'Adventure', 'Animation', 'Children', 'Comedy', 'Crime', 'Documentary', 'Drama', 'Fantasy', 'Film-Noir', 'Horror', 'Musical', 'Mystery', 'Romance', 'Sci-Fi', 'Thriller', 'War', 'Western'])])
-    tfidf_features = len([col for col in X.columns if col.startswith('tfidf_')])
-    rating_features = len([col for col in X.columns if 'rating' in col])
+    genre_features = len([col for col in sample_X.columns if col in ['Action', 'Adventure', 'Animation', 'Children', 'Comedy', 'Crime', 'Documentary', 'Drama', 'Fantasy', 'Film-Noir', 'Horror', 'Musical', 'Mystery', 'Romance', 'Sci-Fi', 'Thriller', 'War', 'Western']])
+    rating_features = len([col for col in sample_X.columns if 'rating' in col])
     
-    print(f"Genre-related features: {genre_features}")
-    print(f"TF-IDF features: {tfidf_features}")
+    print(f"Genre binary features: {genre_features}")
     print(f"Rating-based features: {rating_features}")
-    print(f"Other features: {X.shape[1] - genre_features - tfidf_features}")
+    print(f"Other features: {sample_X.shape[1] - genre_features - rating_features}")
     
     return rf_scores, xgb_scores, baseline_scores
 

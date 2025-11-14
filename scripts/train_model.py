@@ -1,16 +1,21 @@
 import pandas as pd
 import numpy as np
 from sklearn.model_selection import train_test_split
+import sys
+import os
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 from src.preprocessor import DataPreprocessor
 from src.model import RecommendationModel, BaselineModel
 from src.ranker import MovieRanker
 from src.collaborative_filter import GraphBasedCollaborativeFilter
+from config.settings import *
 import joblib
 
 def main():
     # Load data
     print("Loading data...")
-    df = pd.read_csv('ml100k_combined.csv')
+    df = pd.read_csv(COMBINED_DATA_PATH)
     
     # Initialize components
     preprocessor = DataPreprocessor()
@@ -24,16 +29,32 @@ def main():
     print("\nPreparing features...")
     X, y = preprocessor.prepare_features(df, is_training=True)
     
+    # Show final feature list
+    print(f"\nFinal Feature List ({X.shape[1]} features):")
+    print("=" * 60)
+    for i, feature in enumerate(X.columns, 1):
+        print(f"{i:2d}. {feature}")
+    
+    print(f"\nFeature Categories:")
+    basic_features = [col for col in X.columns if col in ['user_encoded', 'item_id', 'age', 'gender_encoded', 'occupation_encoded', 'user_age_at_release']]
+    rating_features = [col for col in X.columns if 'rating' in col]
+    genre_binary = [col for col in X.columns if col in ['Action', 'Adventure', 'Animation', 'Children', 'Comedy', 'Crime', 'Documentary', 'Drama', 'Fantasy', 'Film-Noir', 'Horror', 'Musical', 'Mystery', 'Romance', 'Sci-Fi', 'Thriller', 'War', 'Western']]
+    
+    print(f"Basic features ({len(basic_features)}): {basic_features}")
+    print(f"Rating features ({len(rating_features)}): {rating_features[:5]}...")
+    print(f"Binary genre features ({len(genre_binary)}): {genre_binary}")
+    
     # Split data
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
     
     # Train models
-    print("Training XGBoost model...")
-    ml_model = RecommendationModel('xgb')
+    print("Training Random Forest model...")
+    ml_model = RecommendationModel('rf')
     ml_model.train(X_train, y_train)
     
     print("Training baseline model...")
-    baseline_model.train(df)
+    train_df = df.iloc[X_train.index]
+    baseline_model.train(train_df)
     
     # Evaluate models
     print("\nModel Evaluation:")
@@ -54,7 +75,7 @@ def main():
     joblib.dump(baseline_model, 'models/baseline_model.pkl')
     
     # Save movie metadata for API
-    movie_metadata = df[['item_id', 'title', 'year']].drop_duplicates()
+    movie_metadata = df[['item_id', 'title', 'year', 'genres']].drop_duplicates()
     movie_metadata.to_csv('models/movie_metadata.csv', index=False)
     
     print("Models saved successfully!")
