@@ -1,5 +1,6 @@
 import pandas as pd
 import numpy as np
+from .collaborative_filter import GraphBasedCollaborativeFilter, HybridRecommender
 
 class MovieRanker:
     def __init__(self, model, preprocessor, baseline_model=None):
@@ -7,19 +8,25 @@ class MovieRanker:
         self.preprocessor = preprocessor
         self.baseline_model = baseline_model
         self.movie_data = None
+        self.collaborative_filter = GraphBasedCollaborativeFilter()
+        self.hybrid_recommender = None
         
     def set_movie_data(self, df):
-        """Set movie metadata"""
+        """Set movie metadata and build user similarity graph"""
         self.movie_data = df[['item_id', 'title', 'year']].drop_duplicates()
-        # Add genres as list if available
-        if 'genres' in df.columns:
-            genre_data = df[['item_id', 'genres']].drop_duplicates()
-            self.movie_data = self.movie_data.merge(genre_data, on='item_id', how='left')
-        print("Movie data loaded successfully!")
+        print("Building user similarity graph...")
+        self.collaborative_filter.build_user_graph(df)
+        self.hybrid_recommender = HybridRecommender(self.collaborative_filter, self.model, self.preprocessor)
+        print("User graph built successfully!")
         
     def rank_movies(self, user_id, candidate_movies, df, use_baseline=False):
-        """Rank candidate movies using ML model with new features"""
+        """Rank candidate movies using hybrid approach with collaborative filtering for similar users"""
         rankings = []
+        cf_count = 0
+        ml_count = 0
+        
+        # Check if user has very similar preferences to other users
+        has_similar, similar_count, total_common, _ = self.collaborative_filter.check_user_similarity(user_id, df)
         
         # Get user profile for feature creation
         user_profile = df[df['user_id'] == user_id].iloc[0]
@@ -28,8 +35,15 @@ class MovieRanker:
             if use_baseline and self.baseline_model:
                 score = self.baseline_model.predict(user_id, movie_id)
                 method = 'baseline'
+            elif has_similar and self.hybrid_recommender:
+                # Use collaborative filtering for users with similar preferences
+                score, method = self.hybrid_recommender.predict_rating(user_id, movie_id, df)
+                if method == 'collaborative':
+                    cf_count += 1
+                else:
+                    ml_count += 1
             else:
-                # Create synthetic user-movie pair with all features
+                # Use ML model for users without similar preferences
                 movie_data = df[df['item_id'] == movie_id].iloc[0]
                 
                 # Create test row with all required features
@@ -59,6 +73,7 @@ class MovieRanker:
                 features, _ = self.preprocessor.prepare_features(test_row, is_training=False)
                 score = self.model.predict(features)[0]
                 method = 'ml_model'
+                ml_count += 1
             
             # Get movie info
             movie_info = self.movie_data[self.movie_data['item_id'] == movie_id].iloc[0]
@@ -67,13 +82,18 @@ class MovieRanker:
                 'movie_id': movie_id,
                 'title': movie_info['title'],
                 'predicted_rating': score,
-                'genres': movie_info.get('genres', []),
                 'year': movie_info['year'],
                 'method': method
             })
         
         # Sort by predicted rating (descending)
         rankings.sort(key=lambda x: x['predicted_rating'], reverse=True)
+        
+        if has_similar:
+            print(f"User {user_id} has similar preferences ({similar_count} similar users found with {total_common} total common movies)")
+        
+        if cf_count > 0 or ml_count > 0:
+            print(f"Predictions: {cf_count} collaborative filtering (≥3 similar users rated movie), {ml_count} ML model")
         
         return rankings
     

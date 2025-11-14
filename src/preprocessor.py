@@ -1,6 +1,7 @@
 import pandas as pd
 import numpy as np
 from sklearn.preprocessing import LabelEncoder, StandardScaler
+from sklearn.feature_extraction.text import TfidfVectorizer
 import joblib
 
 class DataPreprocessor:
@@ -8,6 +9,7 @@ class DataPreprocessor:
         self.user_encoder = LabelEncoder()
         self.occupation_encoder = LabelEncoder()
         self.scaler = StandardScaler()
+        self.genre_vectorizer = TfidfVectorizer()
         
     def prepare_features(self, df, is_training=True):
         """Prepare features for training or inference"""
@@ -28,6 +30,20 @@ class DataPreprocessor:
                       'Documentary', 'Drama', 'Fantasy', 'Film-Noir', 'Horror', 'Musical', 
                       'Mystery', 'Romance', 'Sci-Fi', 'Thriller', 'War', 'Western']
         
+        # Create genre string for TF-IDF
+        df['genre_str'] = df[genre_names].apply(
+            lambda x: ' '.join([genre for genre, val in zip(genre_names, x) if val == 1]), axis=1
+        )
+        
+        # TF-IDF genre features
+        if is_training:
+            genre_features = self.genre_vectorizer.fit_transform(df['genre_str'])
+        else:
+            genre_features = self.genre_vectorizer.transform(df['genre_str'])
+            
+        genre_tfidf_df = pd.DataFrame(genre_features.toarray(), 
+                                     columns=[f'tfidf_{i}' for i in range(genre_features.shape[1])])
+        
         # Feature columns
         feature_cols = ['user_encoded', 'item_id', 'user_age_at_release', 'gender_encoded', 
                        'occupation_encoded', 'movie_avg_rating', 'user_avg_rating']
@@ -47,6 +63,9 @@ class DataPreprocessor:
         available_cols = [col for col in feature_cols if col in df.columns]
         features = df[available_cols].copy()
         
+        # Add TF-IDF features
+        features = pd.concat([features.reset_index(drop=True), genre_tfidf_df], axis=1)
+        
         # Scale numerical features
         num_cols = ['user_age_at_release', 'movie_avg_rating', 'user_avg_rating'] + user_genre_cols + global_genre_cols
         num_cols = [col for col in num_cols if col in features.columns]
@@ -64,7 +83,8 @@ class DataPreprocessor:
         joblib.dump({
             'user_encoder': self.user_encoder,
             'occupation_encoder': self.occupation_encoder,
-            'scaler': self.scaler
+            'scaler': self.scaler,
+            'genre_vectorizer': self.genre_vectorizer
         }, filepath)
     
     def load(self, filepath):
@@ -73,4 +93,5 @@ class DataPreprocessor:
         self.user_encoder = components['user_encoder']
         self.occupation_encoder = components['occupation_encoder']
         self.scaler = components['scaler']
+        self.genre_vectorizer = components['genre_vectorizer']
         return self

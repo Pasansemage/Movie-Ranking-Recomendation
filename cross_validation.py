@@ -7,12 +7,12 @@ from src.model import RecommendationModel, BaselineModel
 def cross_validate_models():
     # Load data
     df = pd.read_csv('ml100k_combined.csv')
-    df['genres'] = df['genres'].fillna('[]')
     
-    # Calculate user activity weights
+    print(f"Dataset shape: {df.shape}")
+    print(f"Features available: {list(df.columns)[:10]}...")  # Show first 10 columns
+    
+    # User activity stats
     user_counts = df['user_id'].value_counts()
-    df['user_weight'] = df['user_id'].map(lambda x: 1.0 / user_counts[x])
-    
     print(f"User activity stats:")
     print(f"Min ratings per user: {user_counts.min()}")
     print(f"Max ratings per user: {user_counts.max()}")
@@ -29,7 +29,8 @@ def cross_validate_models():
     xgb_scores = []
     baseline_scores = []
     
-    print("\nRunning 5-Fold Cross Validation...")
+    print(f"\nRunning 5-Fold Cross Validation with {X.shape[1]} features...")
+    print(f"Training on {len(df)} samples")
     
     for fold, (train_idx, test_idx) in enumerate(kf.split(X), 1):
         print(f"Fold {fold}/5")
@@ -70,10 +71,28 @@ def cross_validate_models():
     print(f"XGBoost - Mean RMSE: {np.mean(xgb_scores):.3f} ± {np.std(xgb_scores):.3f}")
     print(f"Baseline - Mean RMSE: {np.mean(baseline_scores):.3f} ± {np.std(baseline_scores):.3f}")
     
+    # Model comparison
     best_model = "XGBoost" if np.mean(xgb_scores) < np.mean(rf_scores) else "Random Forest"
-    improvement = abs(np.mean(rf_scores) - np.mean(xgb_scores))
-    print(f"\nBest model: {best_model}")
-    print(f"Improvement: {improvement:.3f} RMSE difference")
+    best_score = min(np.mean(rf_scores), np.mean(xgb_scores))
+    baseline_mean = np.mean(baseline_scores)
+    
+    print(f"\nBest ML model: {best_model} (RMSE: {best_score:.3f})")
+    print(f"Improvement over baseline: {baseline_mean - best_score:.3f} RMSE")
+    print(f"Relative improvement: {((baseline_mean - best_score) / baseline_mean * 100):.1f}%")
+    
+    # Feature importance analysis for best model
+    print(f"\nFeature Analysis:")
+    print(f"Total features used: {X.shape[1]}")
+    
+    # Count different feature types
+    genre_features = len([col for col in X.columns if any(genre.lower() in col.lower() for genre in ['Action', 'Adventure', 'Animation', 'Children', 'Comedy', 'Crime', 'Documentary', 'Drama', 'Fantasy', 'Film-Noir', 'Horror', 'Musical', 'Mystery', 'Romance', 'Sci-Fi', 'Thriller', 'War', 'Western'])])
+    tfidf_features = len([col for col in X.columns if col.startswith('tfidf_')])
+    rating_features = len([col for col in X.columns if 'rating' in col])
+    
+    print(f"Genre-related features: {genre_features}")
+    print(f"TF-IDF features: {tfidf_features}")
+    print(f"Rating-based features: {rating_features}")
+    print(f"Other features: {X.shape[1] - genre_features - tfidf_features}")
     
     return rf_scores, xgb_scores, baseline_scores
 

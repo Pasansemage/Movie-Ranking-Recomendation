@@ -24,8 +24,8 @@ class MovieRanking(BaseModel):
     movie_id: int
     title: str
     predicted_rating: float
-    genres: str
     year: float
+    method: str = "ml_model"
 
 @app.on_event("startup")
 async def load_models():
@@ -33,16 +33,15 @@ async def load_models():
     
     print("Loading pre-trained models...")
     
-    # Load data (only user data needed for inference)
+    # Load data with new feature structure
     df = pd.read_csv('ml100k_combined.csv')
-    df['genres'] = df['genres'].fillna('[]')
     
     # Load movie metadata
     movie_metadata = pd.read_csv('models/movie_metadata.csv')
     
-    # Load pre-trained models
+    # Load pre-trained models (XGBoost)
     preprocessor = DataPreprocessor().load('models/preprocessor.pkl')
-    ml_model = RecommendationModel('rf').load('models/ml_model.pkl')
+    ml_model = RecommendationModel('xgb').load('models/ml_model.pkl')
     baseline_model = joblib.load('models/baseline_model.pkl')
     
     # Create ranker with loaded models
@@ -58,7 +57,7 @@ async def load_models():
     except FileNotFoundError:
         print("Collaborative filter not found, using ML model only")
     
-    ranker.set_movie_data(df)  # Use full dataset for similarity calculations
+    ranker.set_movie_data(df)
     
     print("Models loaded successfully!")
 

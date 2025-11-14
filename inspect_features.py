@@ -1,106 +1,120 @@
 import pandas as pd
 import numpy as np
 from src.preprocessor import DataPreprocessor
-from src.model import RecommendationModel
 
 def inspect_features():
-    """Inspect the features created by the preprocessor"""
-    
     # Load data
+    print("Loading data...")
     df = pd.read_csv('ml100k_combined.csv')
-    df['genres'] = df['genres'].fillna('[]')
     
-    # Take a small sample for inspection
-    sample_df = df.head(100).copy()
+    print(f"Dataset shape: {df.shape}")
+    print(f"Columns: {list(df.columns)}")
     
     # Initialize preprocessor
     preprocessor = DataPreprocessor()
     
+    # Sample a few rows for feature inspection
+    sample_df = df.head(10)
+    
+    print("\nSample data:")
+    print(sample_df[['user_id', 'item_id', 'rating', 'age', 'gender', 'occupation']].head())
+    
     # Prepare features
-    print("Creating features...")
+    print("\nPreparing features...")
     X, y = preprocessor.prepare_features(sample_df, is_training=True)
     
-    print(f"\nFeature Matrix Shape: {X.shape}")
-    print(f"Number of features: {X.shape[1]}")
-    print(f"Number of samples: {X.shape[0]}")
-    
-    # Show feature columns
-    print(f"\nFeature Columns:")
-    for i, col in enumerate(X.columns):
-        print(f"{i:3d}: {col}")
-    
-    # Show sample of original vs processed data
-    print(f"\nSample Original Data:")
-    print(sample_df[['user_id', 'item_id', 'age', 'gender', 'occupation', 'genres', 'year']].head(3))
-    
-    print(f"\nSample Processed Features:")
-    print(X.head(3))
-    
-    # Show encoding mappings
-    print(f"\nUser Encoding Sample:")
-    user_mapping = dict(zip(preprocessor.user_encoder.classes_, 
-                           preprocessor.user_encoder.transform(preprocessor.user_encoder.classes_)))
-    print(f"First 10 users: {dict(list(user_mapping.items())[:10])}")
-    
-    print(f"\nOccupation Encoding:")
-    occ_mapping = dict(zip(preprocessor.occupation_encoder.classes_, 
-                          preprocessor.occupation_encoder.transform(preprocessor.occupation_encoder.classes_)))
-    print(occ_mapping)
-    
-    # Show genre features
-    individual_genre_features = [col for col in X.columns if col.startswith('has_')]
-    tfidf_genre_features = [col for col in X.columns if col.startswith('tfidf_')]
-    print(f"\nIndividual Genre Features: {len(individual_genre_features)} total")
-    print(f"Individual genre features: {individual_genre_features}")
-    print(f"\nTF-IDF Genre Features: {len(tfidf_genre_features)} total")
-    print(f"Sample TF-IDF features: {tfidf_genre_features[:10]}")
+    print(f"\nFeature matrix shape: {X.shape}")
+    print(f"Feature columns: {list(X.columns)}")
     
     # Show feature statistics
-    print(f"\nFeature Statistics:")
-    print(X.describe())
+    print("\nFeature Statistics:")
+    print("=" * 50)
     
-    # Train model to get feature importance
-    print(f"\nTraining model for feature importance...")
-    model = RecommendationModel('rf')
-    model.train(X, y)
+    # Basic features
+    basic_features = ['user_encoded', 'item_id', 'user_age_at_release', 'gender_encoded', 
+                     'occupation_encoded', 'movie_avg_rating', 'user_avg_rating']
     
-    # Get feature importance
-    if hasattr(model.model, 'feature_importances_'):
-        importance_df = pd.DataFrame({
-            'feature': X.columns,
-            'importance': model.model.feature_importances_
-        }).sort_values('importance', ascending=False)
-        
-        print(f"\nTop 20 Most Important Features:")
-        print(importance_df.head(20))
-        
-        print(f"\nFeature Importance by Category:")
-        
-        # Categorize features
-        user_features = importance_df[importance_df['feature'].isin(['user_encoded', 'age', 'gender_encoded', 'occupation_encoded'])]
-        movie_features = importance_df[importance_df['feature'].isin(['item_id', 'movie_age'])]
-        individual_genre_features = importance_df[importance_df['feature'].str.startswith('has_')]
-        tfidf_genre_features = importance_df[importance_df['feature'].str.startswith('tfidf_')]
-        
-        print(f"\nUser Features Importance:")
-        print(user_features)
-        
-        print(f"\nMovie Features Importance:")
-        print(movie_features)
-        
-        print(f"\nTop 10 Individual Genre Features Importance:")
-        print(individual_genre_features.head(10))
-        
-        print(f"\nTop 10 TF-IDF Genre Features Importance:")
-        print(tfidf_genre_features.head(10))
-        
-        # Summary by category
-        print(f"\nImportance Summary:")
-        print(f"User features total importance: {user_features['importance'].sum():.3f}")
-        print(f"Movie features total importance: {movie_features['importance'].sum():.3f}")
-        print(f"Individual genre features total importance: {individual_genre_features['importance'].sum():.3f}")
-        print(f"TF-IDF genre features total importance: {tfidf_genre_features['importance'].sum():.3f}")
-        print(f"All genre features total importance: {(individual_genre_features['importance'].sum() + tfidf_genre_features['importance'].sum()):.3f}")
+    print("Basic Features:")
+    for feature in basic_features:
+        if feature in X.columns:
+            print(f"  {feature}: min={X[feature].min():.3f}, max={X[feature].max():.3f}, mean={X[feature].mean():.3f}")
+    
+    # Binary genre features
+    genre_names = ['Action', 'Adventure', 'Animation', 'Children', 'Comedy', 'Crime', 
+                  'Documentary', 'Drama', 'Fantasy', 'Film-Noir', 'Horror', 'Musical', 
+                  'Mystery', 'Romance', 'Sci-Fi', 'Thriller', 'War', 'Western']
+    
+    print("\nBinary Genre Features:")
+    for genre in genre_names:
+        if genre in X.columns:
+            count = X[genre].sum()
+            print(f"  {genre}: {count} movies have this genre")
+    
+    # User genre average ratings
+    print("\nUser Genre Average Ratings:")
+    for genre in genre_names:
+        col_name = f'user_avg_{genre.lower()}_rating'
+        if col_name in X.columns:
+            print(f"  {col_name}: min={X[col_name].min():.3f}, max={X[col_name].max():.3f}, mean={X[col_name].mean():.3f}")
+    
+    # Global genre average ratings
+    print("\nGlobal Genre Average Ratings:")
+    for genre in genre_names:
+        col_name = f'global_avg_{genre.lower()}_rating'
+        if col_name in X.columns:
+            print(f"  {col_name}: {X[col_name].iloc[0]:.3f}")
+    
+    # TF-IDF features
+    tfidf_cols = [col for col in X.columns if col.startswith('tfidf_')]
+    print(f"\nTF-IDF Features: {len(tfidf_cols)} features")
+    if tfidf_cols:
+        tfidf_data = X[tfidf_cols]
+        print(f"  Non-zero values: {(tfidf_data > 0).sum().sum()}")
+        print(f"  Max value: {tfidf_data.max().max():.3f}")
+        print(f"  Mean value: {tfidf_data.mean().mean():.3f}")
+    
+    # Show sample feature vector
+    print("\nSample Feature Vector (first row):")
+    print("=" * 50)
+    sample_features = X.iloc[0]
+    for i, (feature, value) in enumerate(sample_features.items()):
+        if i < 20:  # Show first 20 features
+            print(f"  {feature}: {value:.3f}")
+        elif i == 20:
+            print(f"  ... and {len(sample_features) - 20} more features")
+            break
+    
+    # Feature importance analysis
+    print("\nFeature Analysis:")
+    print("=" * 50)
+    
+    # Check for missing values
+    missing_counts = X.isnull().sum()
+    if missing_counts.sum() > 0:
+        print("Features with missing values:")
+        for feature, count in missing_counts[missing_counts > 0].items():
+            print(f"  {feature}: {count} missing values")
+    else:
+        print("No missing values in features")
+    
+    # Check feature variance
+    print("\nFeature Variance Analysis:")
+    variances = X.var()
+    zero_var_features = variances[variances == 0].index.tolist()
+    if zero_var_features:
+        print(f"Zero variance features: {zero_var_features}")
+    else:
+        print("All features have non-zero variance")
+    
+    # Show correlation with target
+    print("\nCorrelation with Rating:")
+    correlations = X.corrwith(pd.Series(y, index=X.index)).abs().sort_values(ascending=False)
+    print("Top 10 features correlated with rating:")
+    for feature, corr in correlations.head(10).items():
+        if not pd.isna(corr):
+            print(f"  {feature}: {corr:.3f}")
+    
+    return X, y, preprocessor
 
 if __name__ == "__main__":
-    inspect_features()
+    X, y, preprocessor = inspect_features()
