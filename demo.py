@@ -12,7 +12,7 @@ def demo_recommendation_system():
     
     # Initialize and train models
     preprocessor = DataPreprocessor()
-    X, y = preprocessor.prepare_features(df)
+    X, y = preprocessor.prepare_features(df, is_training=True)
     
     ml_model = RecommendationModel('rf')
     ml_model.train(X, y)

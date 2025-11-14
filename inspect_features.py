@@ -48,9 +48,12 @@ def inspect_features():
     print(occ_mapping)
     
     # Show genre features
-    genre_features = [col for col in X.columns if col.startswith('genre_')]
-    print(f"\nGenre Features: {len(genre_features)} total")
-    print(f"Sample genre features: {genre_features[:10]}")
+    individual_genre_features = [col for col in X.columns if col.startswith('has_')]
+    tfidf_genre_features = [col for col in X.columns if col.startswith('tfidf_')]
+    print(f"\nIndividual Genre Features: {len(individual_genre_features)} total")
+    print(f"Individual genre features: {individual_genre_features}")
+    print(f"\nTF-IDF Genre Features: {len(tfidf_genre_features)} total")
+    print(f"Sample TF-IDF features: {tfidf_genre_features[:10]}")
     
     # Show feature statistics
     print(f"\nFeature Statistics:")
@@ -76,7 +79,8 @@ def inspect_features():
         # Categorize features
         user_features = importance_df[importance_df['feature'].isin(['user_encoded', 'age', 'gender_encoded', 'occupation_encoded'])]
         movie_features = importance_df[importance_df['feature'].isin(['item_id', 'movie_age'])]
-        genre_features = importance_df[importance_df['feature'].str.startswith('genre_')]
+        individual_genre_features = importance_df[importance_df['feature'].str.startswith('has_')]
+        tfidf_genre_features = importance_df[importance_df['feature'].str.startswith('tfidf_')]
         
         print(f"\nUser Features Importance:")
         print(user_features)
@@ -84,14 +88,19 @@ def inspect_features():
         print(f"\nMovie Features Importance:")
         print(movie_features)
         
-        print(f"\nTop 10 Genre Features Importance:")
-        print(genre_features.head(10))
+        print(f"\nTop 10 Individual Genre Features Importance:")
+        print(individual_genre_features.head(10))
+        
+        print(f"\nTop 10 TF-IDF Genre Features Importance:")
+        print(tfidf_genre_features.head(10))
         
         # Summary by category
         print(f"\nImportance Summary:")
         print(f"User features total importance: {user_features['importance'].sum():.3f}")
         print(f"Movie features total importance: {movie_features['importance'].sum():.3f}")
-        print(f"Genre features total importance: {genre_features['importance'].sum():.3f}")
+        print(f"Individual genre features total importance: {individual_genre_features['importance'].sum():.3f}")
+        print(f"TF-IDF genre features total importance: {tfidf_genre_features['importance'].sum():.3f}")
+        print(f"All genre features total importance: {(individual_genre_features['importance'].sum() + tfidf_genre_features['importance'].sum()):.3f}")
 
 if __name__ == "__main__":
     inspect_features()

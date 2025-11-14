@@ -29,20 +29,33 @@ class DataPreprocessor:
         df['movie_age'] = 1998 - df['year'].fillna(1998)
         df['genre_str'] = df['genres'].astype(str)
         
-        # Genre features
+        # Individual genre columns (binary)
+        genre_names = ['Action', 'Adventure', 'Animation', 'Children', 'Comedy', 'Crime', 
+                      'Documentary', 'Drama', 'Fantasy', 'Film-Noir', 'Horror', 'Musical', 
+                      'Mystery', 'Romance', 'Sci-Fi', 'Thriller', 'War', 'Western']
+        
+        for genre in genre_names:
+            df[f'has_{genre}'] = df['genre_str'].str.contains(genre, case=False).astype(int)
+        
+        # TF-IDF genre features
         if is_training:
             genre_features = self.genre_vectorizer.fit_transform(df['genre_str'])
         else:
             genre_features = self.genre_vectorizer.transform(df['genre_str'])
             
-        genre_df = pd.DataFrame(genre_features.toarray(), 
-                               columns=[f'genre_{i}' for i in range(genre_features.shape[1])])
+        genre_tfidf_df = pd.DataFrame(genre_features.toarray(), 
+                                     columns=[f'tfidf_{i}' for i in range(genre_features.shape[1])])
         
         # Combine features
         feature_cols = ['user_encoded', 'item_id', 'age', 'gender_encoded', 
                        'occupation_encoded', 'movie_age']
+        
+        # Add individual genre columns
+        genre_cols = [f'has_{genre}' for genre in genre_names]
+        feature_cols.extend(genre_cols)
+        
         features = df[feature_cols].copy()
-        features = pd.concat([features.reset_index(drop=True), genre_df], axis=1)
+        features = pd.concat([features.reset_index(drop=True), genre_tfidf_df], axis=1)
         
         # Scale numerical features
         num_cols = ['age', 'movie_age']

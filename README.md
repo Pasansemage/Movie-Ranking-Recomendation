@@ -11,7 +11,9 @@ A personalized movie ranking system that predicts user preferences and ranks can
 
 ### Feature Engineering
 - User encoding and demographic normalization
-- Movie age calculation and genre vectorization using TF-IDF
+- Movie age calculation and movie metadata features
+- Individual binary genre columns (18 genres: Action, Comedy, Drama, etc.)
+- TF-IDF genre vectorization for genre combinations
 - Standard scaling for numerical features
 
 ### Ranking Logic

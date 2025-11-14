@@ -3,18 +3,25 @@ from sklearn.ensemble import RandomForestRegressor
 from sklearn.linear_model import LinearRegression
 from sklearn.metrics import mean_squared_error, mean_absolute_error
 import joblib
+try:
+    import xgboost as xgb
+    XGBOOST_AVAILABLE = True
+except ImportError:
+    XGBOOST_AVAILABLE = False
 
 class RecommendationModel:
     def __init__(self, model_type='rf'):
         if model_type == 'rf':
             self.model = RandomForestRegressor(n_estimators=100, random_state=42)
+        elif model_type == 'xgb' and XGBOOST_AVAILABLE:
+            self.model = xgb.XGBRegressor(n_estimators=100, random_state=42, verbosity=0)
         else:
             self.model = LinearRegression()
         self.model_type = model_type
         
-    def train(self, X, y):
+    def train(self, X, y, sample_weight=None):
         """Train the recommendation model"""
-        self.model.fit(X, y)
+        self.model.fit(X, y, sample_weight=sample_weight)
         
     def predict(self, X):
         """Predict ratings for given features"""
