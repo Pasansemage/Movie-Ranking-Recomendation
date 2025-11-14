@@ -12,7 +12,14 @@ except ImportError:
 class RecommendationModel:
     def __init__(self, model_type='rf'):
         if model_type == 'rf':
-            self.model = RandomForestRegressor(n_estimators=100, random_state=42)
+            self.model = RandomForestRegressor(
+                n_estimators=200, 
+                max_depth=15, 
+                min_samples_split=5, 
+                min_samples_leaf=2, 
+                random_state=42, 
+                n_jobs=-1
+            )
         elif model_type == 'xgb' and XGBOOST_AVAILABLE:
             self.model = xgb.XGBRegressor(n_estimators=100, random_state=42, verbosity=0)
         else:

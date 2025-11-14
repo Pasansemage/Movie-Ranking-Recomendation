@@ -6,6 +6,7 @@ import joblib
 from src.preprocessor import DataPreprocessor
 from src.model import RecommendationModel, BaselineModel
 from src.ranker import MovieRanker
+from src.collaborative_filter import GraphBasedCollaborativeFilter
 
 app = FastAPI(title="Movie Recommendation API")
 
@@ -46,7 +47,18 @@ async def load_models():
     
     # Create ranker with loaded models
     ranker = MovieRanker(ml_model, preprocessor, baseline_model)
-    ranker.set_movie_data(movie_metadata)
+    
+    # Load collaborative filter if available
+    try:
+        collaborative_filter = joblib.load('models/collaborative_filter.pkl')
+        ranker.collaborative_filter = collaborative_filter
+        from src.collaborative_filter import HybridRecommender
+        ranker.hybrid_recommender = HybridRecommender(collaborative_filter, ml_model, preprocessor)
+        print("Collaborative filter loaded successfully!")
+    except FileNotFoundError:
+        print("Collaborative filter not found, using ML model only")
+    
+    ranker.set_movie_data(df)  # Use full dataset for similarity calculations
     
     print("Models loaded successfully!")
 
