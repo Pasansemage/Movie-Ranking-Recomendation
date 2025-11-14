@@ -27,8 +27,11 @@ class DataPreprocessor:
         """Prepare features with proper train/test separation"""
         df = df.copy()
         
-        # Parse genres
-        df['genre_list'] = df['genres'].apply(self.parse_genres)
+        # Parse genres - handle missing genres column
+        if 'genres' in df.columns:
+            df['genre_list'] = df['genres'].apply(self.parse_genres)
+        else:
+            df['genre_list'] = [[] for _ in range(len(df))]
         
         # Calculate statistical features from training data only
         if is_training:

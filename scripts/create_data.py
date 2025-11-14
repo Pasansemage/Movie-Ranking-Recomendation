@@ -1,21 +1,27 @@
 import pandas as pd
 import numpy as np
 from datetime import datetime
+import os
+import sys
+
+# Get project root directory
+project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.append(project_root)
 
 def combine_ml100k_data():
     # Load ratings data
-    ratings = pd.read_csv('ml-100k/u.data', sep='\t', names=['user_id', 'item_id', 'rating', 'timestamp'])
+    ratings = pd.read_csv('data/ml-100k/u.data', sep='\t', names=['user_id', 'item_id', 'rating', 'timestamp'])
     ratings['timestamp'] = pd.to_datetime(ratings['timestamp'], unit='s')
     
     # Load user data
-    users = pd.read_csv('ml-100k/u.user', sep='|', names=['user_id', 'age', 'gender', 'occupation', 'zip_code'])
+    users = pd.read_csv('data/ml-100k/u.user', sep='|', names=['user_id', 'age', 'gender', 'occupation', 'zip_code'])
     
     # Load item data
     genre_cols = ['unknown', 'Action', 'Adventure', 'Animation', 'Children', 'Comedy', 'Crime', 
                   'Documentary', 'Drama', 'Fantasy', 'Film-Noir', 'Horror', 'Musical', 'Mystery', 
                   'Romance', 'Sci-Fi', 'Thriller', 'War', 'Western']
     
-    items = pd.read_csv('ml-100k/u.item', sep='|', encoding='latin-1', 
+    items = pd.read_csv('data/ml-100k/u.item', sep='|', encoding='latin-1', 
                        names=['item_id', 'title', 'release_date', 'video_release_date', 'imdb_url'] + genre_cols)
     
     # Clean item data
@@ -64,11 +70,16 @@ def combine_ml100k_data():
         genre_avg = combined[genre_mask]['rating'].mean()
         combined[f'global_avg_{genre.lower()}_rating'] = genre_avg
     
+    # Create genres column as list for TF-IDF features
+    combined['genres'] = combined[genre_cols_clean].apply(
+        lambda row: [genre for genre in genre_cols_clean if row[genre] == 1], axis=1
+    )
+    
     # Drop unnecessary columns
     combined = combined.drop(columns=['video_release_date', 'imdb_url', 'unknown'])
     
     # Save combined dataset
-    combined.to_csv('ml100k_combined.csv', index=False)
+    combined.to_csv('data/ml100k_combined.csv', index=False)
     
     print("MovieLens 100k Data Combined Successfully!")
     print(f"Dataset shape: {combined.shape}")

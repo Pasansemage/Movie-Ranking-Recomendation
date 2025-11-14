@@ -10,7 +10,7 @@ A comprehensive movie ranking system that combines collaborative filtering, adva
 - **Distribution**: 100,000 ratings from 943 users on 1,682 movies
 
 ### Master Table Design
-- **Primary Keys**: Composite key (`user_id`, `item_id`, `timestamp`)
+- **Primary Keys**: Composite key (`user_id`, `item_id`)
 - **Granularity**: One row per user-movie rating interaction
 - **Data Sources**: Combined u.data (ratings), u.user (demographics), u.item (movie metadata)
 - **Time Period**: September 1997 - April 1998
@@ -229,14 +229,6 @@ python scripts/demo.py
 # Features: user input, actual vs predicted ratings, search, top recommendations
 # OR using Makefile
 make demo
-```
-
-### 5. Run Tests
-```bash
-# Run unit tests
-python -m pytest tests/ -v
-# OR using Makefile
-make test
 ```
 
 ### 5. Production API
